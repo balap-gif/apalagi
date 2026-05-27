@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Staff Operations Dashboard | Real-time Monitoring System</title>
-    <meta name="description" content="Real-time staff monitoring and permission management system">
+    <meta name="description" content="Real-time staff monitoring and permission management system with Google Sign-In">
     
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -15,10 +15,10 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-        import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+        import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+        import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, deleteDoc, query, where, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
         
-        // Firebase Configuration
+        // ============ FIREBASE CONFIGURATION ============
         const firebaseConfig = {
             apiKey: "AIzaSyCXrNxaFTOjXiD7B21t2xEfZiKd5H5mBhg",
             authDomain: "staff-dashboard-izin.firebaseapp.com",
@@ -33,13 +33,9 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const googleProvider = new GoogleAuthProvider();
         
-        // Make available globally
-        window.db = db;
-        window.auth = auth;
-        window.serverTimestamp = serverTimestamp;
-        
-        // App State
+        // ============ GLOBAL STATE ============
         let currentUser = null;
         let currentUserRole = null;
         let currentUserData = null;
@@ -48,31 +44,13 @@
         let countdownInterval = null;
         let todayIzinCount = 0;
         let unsubscribeStaff = null;
-        let unsubscribeIzin = null;
+        let currentPage = 'dashboard';
         
-        // Role definitions
-        const ROLES = {
-            LEADER: 'LEADER',
-            CS_LINE: 'CS_LINE',
-            CS_LIVECHAT: 'CS_LIVECHAT',
-            KKS: 'KKS',
-            KASIR: 'KASIR'
-        };
-        
-        const ROLE_PERMISSIONS = {
-            LEADER: ['full_access', 'manage_staff', 'manage_shifts', 'manage_jobdesk', 'view_reports', 'export_data'],
-            CS_LINE: ['create_izin', 'manage_jobdesk', 'view_monitoring', 'view_history'],
-            CS_LIVECHAT: ['create_izin', 'view_shifts', 'view_jobdesk', 'view_monitoring'],
-            KKS: ['create_izin', 'view_shifts', 'view_jobdesk', 'view_monitoring'],
-            KASIR: ['create_izin', 'view_shifts', 'view_jobdesk', 'view_monitoring']
-        };
-        
-        // Helper Functions
+        // ============ HELPER FUNCTIONS ============
         function showNotification(message, type = 'info') {
             const container = document.getElementById('notification-container');
             if (!container) return;
             
-            const notification = document.createElement('div');
             const colors = {
                 success: 'from-green-500 to-emerald-500',
                 error: 'from-red-500 to-pink-500',
@@ -80,12 +58,20 @@
                 info: 'from-blue-500 to-cyan-500'
             };
             
-            notification.className = `transform transition-all duration-300 translate-x-full`;
+            const icons = {
+                success: '✓',
+                error: '✗',
+                warning: '!',
+                info: 'ℹ'
+            };
+            
+            const notification = document.createElement('div');
+            notification.className = 'transform transition-all duration-300 translate-x-full mb-2';
             notification.innerHTML = `
                 <div class="bg-gradient-to-r ${colors[type]} rounded-lg shadow-lg p-4 min-w-[300px] backdrop-blur-sm">
                     <div class="flex items-center gap-3">
                         <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                            <span class="text-white text-lg">${type === 'success' ? '✓' : type === 'error' ? '✗' : type === 'warning' ? '!' : 'ℹ'}</span>
+                            <span class="text-white text-lg font-bold">${icons[type]}</span>
                         </div>
                         <p class="text-white font-medium">${message}</p>
                     </div>
@@ -100,27 +86,6 @@
             }, 3000);
         }
         
-        function playSound(type) {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            if (type === 'warning') {
-                oscillator.frequency.value = 880;
-                gainNode.gain.value = 0.3;
-                oscillator.start();
-                setTimeout(() => oscillator.stop(), 500);
-            } else if (type === 'success') {
-                oscillator.frequency.value = 523.25;
-                gainNode.gain.value = 0.2;
-                oscillator.start();
-                setTimeout(() => oscillator.stop(), 300);
-            }
-        }
-        
         function formatTime(seconds) {
             if (!seconds && seconds !== 0) return '--:--';
             const mins = Math.floor(seconds / 60);
@@ -128,28 +93,364 @@
             return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         }
         
-        function formatDate(date) {
-            return new Date(date).toLocaleDateString('id-ID', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric'
-            });
+        function formatDateTime(date) {
+            if (!date) return '-';
+            const d = date.toDate ? date.toDate() : new Date(date);
+            return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
         
-        function formatTimeHM(date) {
-            return new Date(date).toLocaleTimeString('id-ID', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+        function getCurrentShift() {
+            const hour = new Date().getHours();
+            if (hour >= 6 && hour < 14) return '🌅 Pagi (06:00-14:00)';
+            if (hour >= 14 && hour < 22) return '🌇 Sore (14:00-22:00)';
+            return '🌙 Malam (22:00-06:00)';
         }
         
-        // Render Functions
-        function renderApp() {
-            if (!currentUser) {
-                renderLogin();
-            } else {
-                renderDashboard();
+        // ============ DATA LOADING ============
+        async function loadStaffData() {
+            try {
+                const snapshot = await getDocs(collection(db, 'staff'));
+                staffList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // Update current user data
+                currentUserData = staffList.find(s => s.id === currentUser?.uid);
+                
+                if (currentUserData) {
+                    // Check today's izin count
+                    const today = new Date().toISOString().split('T')[0];
+                    const izinSnapshot = await getDocs(query(
+                        collection(db, 'izin'),
+                        where('staffId', '==', currentUser?.uid),
+                        where('date', '==', today)
+                    ));
+                    todayIzinCount = izinSnapshot.size;
+                    
+                    // Check active izin
+                    const activeIzinSnapshot = await getDocs(query(
+                        collection(db, 'izin'),
+                        where('staffId', '==', currentUser?.uid),
+                        where('status', '==', 'active')
+                    ));
+                    
+                    if (!activeIzinSnapshot.empty) {
+                        const izinDoc = activeIzinSnapshot.docs[0];
+                        activeIzin = { id: izinDoc.id, ...izinDoc.data() };
+                        
+                        if (countdownInterval) clearInterval(countdownInterval);
+                        countdownInterval = setInterval(() => updateCountdownDisplay(), 1000);
+                    } else {
+                        if (activeIzin) {
+                            activeIzin = null;
+                            if (countdownInterval) clearInterval(countdownInterval);
+                        }
+                    }
+                }
+                
+                // Refresh UI based on current page
+                refreshCurrentPage();
+                
+            } catch (error) {
+                console.error('Error loading staff:', error);
             }
+        }
+        
+        async function updateCountdownDisplay() {
+            if (activeIzin && activeIzin.endTime) {
+                const now = new Date();
+                const end = activeIzin.endTime.toDate ? activeIzin.endTime.toDate() : new Date(activeIzin.endTime);
+                const diff = Math.max(0, Math.floor((end - now) / 1000));
+                
+                const timer = document.getElementById('countdown-timer');
+                if (timer) timer.textContent = formatTime(diff);
+                
+                if (diff <= 0 && countdownInterval) {
+                    clearInterval(countdownInterval);
+                    await handleIzinTimeout();
+                }
+            }
+        }
+        
+        async function handleIzinTimeout() {
+            if (activeIzin) {
+                try {
+                    const izinRef = doc(db, 'izin', activeIzin.id);
+                    await updateDoc(izinRef, {
+                        status: 'completed',
+                        completedAt: serverTimestamp(),
+                        late: false
+                    });
+                    
+                    const staffRef = doc(db, 'staff', currentUser.uid);
+                    await updateDoc(staffRef, {
+                        izinStatus: null,
+                        status: 'aktif'
+                    });
+                    
+                    activeIzin = null;
+                    showNotification('Waktu izin telah selesai, silakan kembali bertugas', 'info');
+                    await loadStaffData();
+                } catch (error) {
+                    console.error('Error handling izin timeout:', error);
+                }
+            }
+        }
+        
+        // ============ BUSINESS LOGIC ============
+        async function createIzin(type, duration) {
+            if (!currentUserData?.absenMasuk) {
+                showNotification('❌ Anda belum absen masuk! Silakan absen terlebih dahulu.', 'error');
+                return;
+            }
+            
+            if (todayIzinCount >= 4) {
+                showNotification('❌ Batas izin harian telah tercapai (4/4)!', 'error');
+                return;
+            }
+            
+            // Check minimum staff requirement
+            const sameRoleStaff = staffList.filter(s => s.role === currentUserData?.role && s.online && !s.izinStatus);
+            const minRequirements = { KASIR: 3, CS_LINE: 2, CS_LIVECHAT: 2, KKS: 2 };
+            const minRequired = minRequirements[currentUserData?.role];
+            
+            if (minRequired && sameRoleStaff.length < minRequired) {
+                showNotification(`❌ Minimal ${minRequired} staff ${currentUserData?.role} harus tetap aktif!`, 'error');
+                return;
+            }
+            
+            const endTime = new Date();
+            endTime.setMinutes(endTime.getMinutes() + duration);
+            
+            try {
+                const izinData = {
+                    staffId: currentUser.uid,
+                    staffName: currentUserData?.name,
+                    role: currentUserData?.role,
+                    type: type,
+                    duration: duration,
+                    startTime: serverTimestamp(),
+                    endTime: endTime,
+                    date: new Date().toISOString().split('T')[0],
+                    status: 'active',
+                    late: false
+                };
+                
+                const docRef = await addDoc(collection(db, 'izin'), izinData);
+                
+                // Update staff status
+                const staffRef = doc(db, 'staff', currentUser.uid);
+                await updateDoc(staffRef, {
+                    izinStatus: 'keluar',
+                    status: 'izin',
+                    izinStart: serverTimestamp(),
+                    izinEnd: endTime
+                });
+                
+                showNotification(`✅ Izin ${type === 'merokok' ? 'Merokok' : 'Tidak Merokok'} berhasil dibuat! Durasi: ${duration} menit`, 'success');
+                await loadStaffData();
+                
+            } catch (error) {
+                console.error('Error creating izin:', error);
+                showNotification('❌ Gagal membuat izin', 'error');
+            }
+        }
+        
+        async function absenMasuk() {
+            try {
+                const staffRef = doc(db, 'staff', currentUser.uid);
+                await updateDoc(staffRef, {
+                    absenMasuk: serverTimestamp(),
+                    status: 'aktif',
+                    online: true,
+                    lastActive: serverTimestamp()
+                });
+                
+                showNotification('✅ Absen masuk berhasil!', 'success');
+                await loadStaffData();
+                setActivePage('dashboard');
+            } catch (error) {
+                showNotification('❌ Gagal absen masuk', 'error');
+            }
+        }
+        
+        async function absenPulang() {
+            try {
+                const staffRef = doc(db, 'staff', currentUser.uid);
+                await updateDoc(staffRef, {
+                    absenPulang: serverTimestamp(),
+                    online: false,
+                    lastActive: serverTimestamp()
+                });
+                
+                showNotification('✅ Absen pulang berhasil! Terima kasih.', 'success');
+                await loadStaffData();
+                setActivePage('dashboard');
+            } catch (error) {
+                showNotification('❌ Gagal absen pulang', 'error');
+            }
+        }
+        
+        // ============ STAFF MANAGEMENT (LEADER ONLY) ============
+        // Leader mendaftarkan staff baru dengan email Gmail
+        async function registerStaff(email, name, role) {
+            if (currentUserRole !== 'LEADER') {
+                showNotification('Akses ditolak! Hanya Leader yang dapat mendaftarkan staff.', 'error');
+                return;
+            }
+            
+            if (!email || !name || !role) {
+                showNotification('Semua field harus diisi!', 'error');
+                return;
+            }
+            
+            // Cek apakah email sudah terdaftar
+            const existingStaff = staffList.find(s => s.email === email);
+            if (existingStaff) {
+                showNotification('Email sudah terdaftar!', 'error');
+                return;
+            }
+            
+            try {
+                // Staff akan login pertama kali dengan Google, kita buat dulu dokumentnya
+                // Staff akan terdaftar otomatis saat pertama kali login Google
+                // Tapi kita buat placeholder dulu dengan status pending
+                const staffId = 'pending_' + Date.now();
+                const staffRef = doc(db, 'staff', staffId);
+                await setDoc(staffRef, {
+                    email: email,
+                    name: name,
+                    role: role,
+                    status: 'pending',
+                    online: false,
+                    registeredBy: currentUser.uid,
+                    registeredAt: serverTimestamp(),
+                    isRegistered: false
+                });
+                
+                showNotification(`✅ Staff ${name} (${email}) berhasil didaftarkan! Staff akan dapat login setelah verifikasi.`, 'success');
+                await loadStaffData();
+                renderStaffManagement();
+            } catch (error) {
+                console.error('Error registering staff:', error);
+                showNotification('❌ Gagal mendaftarkan staff', 'error');
+            }
+        }
+        
+        // Verifikasi staff setelah login Google pertama kali
+        async function verifyStaffRegistration(userId, email, displayName) {
+            // Cari staff dengan email yang sama dan status pending
+            const pendingStaff = staffList.find(s => s.email === email && s.status === 'pending');
+            
+            if (pendingStaff) {
+                // Update staff dengan UID yang benar
+                const oldDocRef = doc(db, 'staff', pendingStaff.id);
+                const newDocRef = doc(db, 'staff', userId);
+                
+                // Pindahkan data ke document dengan UID yang benar
+                await setDoc(newDocRef, {
+                    email: email,
+                    name: pendingStaff.name || displayName,
+                    role: pendingStaff.role,
+                    status: 'aktif',
+                    online: true,
+                    registeredBy: pendingStaff.registeredBy,
+                    registeredAt: pendingStaff.registeredAt,
+                    verifiedAt: serverTimestamp(),
+                    isRegistered: true
+                });
+                
+                // Hapus document pending
+                await deleteDoc(oldDocRef);
+                
+                showNotification(`✅ Selamat datang ${pendingStaff.name}! Akun Anda sudah aktif.`, 'success');
+                return true;
+            }
+            
+            // Cek apakah staff sudah terdaftar dengan UID langsung
+            const existingStaff = staffList.find(s => s.id === userId);
+            if (existingStaff && existingStaff.isRegistered) {
+                return true;
+            }
+            
+            showNotification('❌ Email Anda belum didaftarkan oleh Leader. Silakan hubungi Leader.', 'error');
+            return false;
+        }
+        
+        async function updateStaffRole(staffId, newRole) {
+            if (currentUserRole !== 'LEADER') {
+                showNotification('Akses ditolak!', 'error');
+                return;
+            }
+            
+            try {
+                const staffRef = doc(db, 'staff', staffId);
+                await updateDoc(staffRef, { role: newRole });
+                showNotification('✅ Role staff berhasil diupdate!', 'success');
+                await loadStaffData();
+                renderStaffManagement();
+            } catch (error) {
+                showNotification('❌ Gagal mengupdate role', 'error');
+            }
+        }
+        
+        async function deleteStaff(staffId) {
+            if (currentUserRole !== 'LEADER') {
+                showNotification('Akses ditolak!', 'error');
+                return;
+            }
+            
+            if (confirm('Yakin ingin menghapus staff ini?')) {
+                try {
+                    await deleteDoc(doc(db, 'staff', staffId));
+                    showNotification('✅ Staff berhasil dihapus!', 'success');
+                    await loadStaffData();
+                    renderStaffManagement();
+                } catch (error) {
+                    showNotification('❌ Gagal menghapus staff', 'error');
+                }
+            }
+        }
+        
+        // ============ GOOGLE LOGIN ============
+        async function loginWithGoogle() {
+            try {
+                const result = await signInWithPopup(auth, googleProvider);
+                const user = result.user;
+                
+                // Cek dan verifikasi staff registration
+                const verified = await verifyStaffRegistration(user.uid, user.email, user.displayName);
+                
+                if (!verified) {
+                    await signOut(auth);
+                }
+            } catch (error) {
+                console.error('Error logging in with Google:', error);
+                showNotification('Login gagal: ' + error.message, 'error');
+            }
+        }
+        
+        // ============ RENDER FUNCTIONS ============
+        function refreshCurrentPage() {
+            if (currentPage === 'dashboard') renderDashboardContent();
+            else if (currentPage === 'izin') renderIzinContent();
+            else if (currentPage === 'absensi') renderAbsensiContent();
+            else if (currentPage === 'staff') renderStaffManagement();
+        }
+        
+        function setActivePage(page) {
+            currentPage = page;
+            refreshCurrentPage();
+            
+            // Update active menu
+            document.querySelectorAll('.nav-item').forEach(item => {
+                if (item.dataset.page === page) {
+                    item.classList.add('bg-gradient-to-r', 'from-purple-600/20', 'to-pink-600/20', 'border-l-4', 'border-purple-500');
+                    item.querySelector('span').classList.add('text-white');
+                } else {
+                    item.classList.remove('bg-gradient-to-r', 'from-purple-600/20', 'to-pink-600/20', 'border-l-4', 'border-purple-500');
+                    item.querySelector('span').classList.remove('text-white');
+                    item.querySelector('span').classList.add('text-gray-300');
+                }
+            });
         }
         
         function renderLogin() {
@@ -166,66 +467,51 @@
                                 </svg>
                             </div>
                             <h1 class="text-2xl font-bold text-white mt-4">Staff Operations</h1>
-                            <p class="text-purple-300 text-sm">Monitoring System</p>
+                            <p class="text-purple-300 text-sm">Real-time Monitoring System</p>
                         </div>
                         
-                        <div class="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-purple-500/20 p-6">
-                            <form id="login-form" class="space-y-4">
-                                <div>
-                                    <label class="block text-gray-300 text-sm font-medium mb-2">Email</label>
-                                    <input type="email" id="email" class="w-full px-4 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:border-purple-500 transition-colors" placeholder="staff@company.com" required>
-                                </div>
-                                <div>
-                                    <label class="block text-gray-300 text-sm font-medium mb-2">Password</label>
-                                    <input type="password" id="password" class="w-full px-4 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:border-purple-500 transition-colors" placeholder="••••••••" required>
-                                </div>
-                                <button type="submit" class="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg text-white font-bold hover:shadow-lg hover:shadow-purple-500/50 transition-all">
-                                    Login
-                                </button>
-                            </form>
-                            <div class="mt-4 text-center">
-                                <a href="#" id="forgot-password" class="text-purple-400 text-sm hover:text-purple-300 transition-colors">Lupa Password?</a>
+                        <div class="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-purple-500/20 p-8">
+                            <div class="text-center mb-6">
+                                <p class="text-gray-300">Login dengan akun Google Anda</p>
+                                <p class="text-gray-500 text-sm mt-2">Pastikan email sudah didaftarkan oleh Leader</p>
                             </div>
+                            
+                            <button id="google-login-btn" class="w-full flex items-center justify-center gap-3 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-white font-medium transition-all border border-white/20">
+                                <svg class="w-5 h-5" viewBox="0 0 24 24">
+                                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                </svg>
+                                Login dengan Google
+                            </button>
+                        </div>
+                        
+                        <div class="mt-4 p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                            <p class="text-yellow-400 text-xs text-center">📝 Staff baru harus didaftarkan oleh Leader terlebih dahulu</p>
                         </div>
                     </div>
                 </div>
+                
+                <div id="notification-container" class="fixed top-4 right-4 z-50"></div>
             `;
             
-            document.getElementById('login-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = document.getElementById('email').value;
-                const password = document.getElementById('password').value;
-                
-                try {
-                    const result = await signInWithEmailAndPassword(auth, email, password);
-                    showNotification('Login berhasil!', 'success');
-                } catch (error) {
-                    showNotification('Login gagal: ' + error.message, 'error');
-                }
-            });
-            
-            document.getElementById('forgot-password').addEventListener('click', async (e) => {
-                e.preventDefault();
-                const email = prompt('Masukkan email Anda:');
-                if (email) {
-                    try {
-                        await sendPasswordResetEmail(auth, email);
-                        showNotification('Email reset password telah dikirim!', 'success');
-                    } catch (error) {
-                        showNotification('Gagal mengirim reset password: ' + error.message, 'error');
-                    }
-                }
-            });
+            document.getElementById('google-login-btn').addEventListener('click', loginWithGoogle);
         }
         
         function renderDashboard() {
+            const onlineCount = staffList.filter(s => s.online && s.isRegistered !== false).length;
+            const izinCount = staffList.filter(s => s.izinStatus === 'keluar').length;
+            const totalStaff = staffList.filter(s => s.isRegistered !== false).length;
+            const pendingStaff = staffList.filter(s => s.status === 'pending').length;
+            
             const app = document.getElementById('app');
             app.innerHTML = `
                 <div class="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/10 to-gray-900">
                     <div class="fixed inset-0 opacity-10 pointer-events-none" style="background-image: url('https://cdn.areabermain.club/assets/cdn/az5/2026/03/02/20260302/997f37bf3bc90016a5e32ae52406c5c4/background-web-hokbentoto-1.jpg'); background-size: cover; background-position: center; background-attachment: fixed;"></div>
                     
                     <!-- Sidebar -->
-                    <div id="sidebar" class="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-gray-900 via-purple-900/20 to-gray-900 backdrop-blur-xl border-r border-purple-500/20 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 z-30">
+                    <div id="sidebar" class="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-gray-900 via-purple-900/20 to-gray-900 backdrop-blur-xl border-r border-purple-500/20 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 z-30 overflow-y-auto">
                         <div class="p-6 border-b border-purple-500/20">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/50">
@@ -243,16 +529,17 @@
                         <div class="p-4 m-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                                    <span class="text-white font-bold">${currentUserData?.name?.charAt(0) || 'U'}</span>
+                                    <img src="${currentUser?.photoURL || ''}" class="w-10 h-10 rounded-full object-cover" onerror="this.style.display='none'">
+                                    <span class="text-white font-bold ${currentUser?.photoURL ? 'hidden' : ''}">${currentUserData?.name?.charAt(0) || 'U'}</span>
                                 </div>
-                                <div>
-                                    <p class="text-white font-medium text-sm">${currentUserData?.name || 'User'}</p>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-white font-medium text-sm truncate">${currentUserData?.name || currentUser?.displayName || 'User'}</p>
                                     <p class="text-xs bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">${currentUserRole?.replace('_', ' ')}</p>
                                 </div>
                             </div>
                         </div>
                         
-                        <nav class="flex-1 py-6" id="nav-menu"></nav>
+                        <nav class="flex-1 py-4" id="nav-menu"></nav>
                         
                         <div class="p-4 border-t border-purple-500/20">
                             <button id="logout-btn" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10 transition-all">
@@ -277,23 +564,31 @@
                     </div>
                 </div>
                 
-                <!-- Notification Container -->
                 <div id="notification-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
             `;
             
-            // Setup navigation
+            // Setup navigation menu
             const navMenu = document.getElementById('nav-menu');
-            const menuItems = getMenuItems();
+            const menuItems = [
+                { page: 'dashboard', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+                { page: 'izin', label: 'Izin Keluar', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+                { page: 'absensi', label: 'Absensi', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' }
+            ];
+            
+            if (currentUserRole === 'LEADER') {
+                menuItems.push({ page: 'staff', label: 'Management Staff', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' });
+            }
             
             menuItems.forEach(item => {
                 const link = document.createElement('a');
                 link.href = '#';
-                link.className = `flex items-center gap-3 px-6 py-3 mx-2 rounded-lg transition-all hover:bg-white/5 ${item.active ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 border-l-4 border-purple-500' : ''}`;
+                link.className = `nav-item flex items-center gap-3 px-6 py-3 mx-2 rounded-lg transition-all hover:bg-white/5 ${currentPage === item.page ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 border-l-4 border-purple-500' : ''}`;
+                link.dataset.page = item.page;
                 link.innerHTML = `
-                    <svg class="w-5 h-5 ${item.active ? 'text-purple-400' : 'text-gray-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5 ${currentPage === item.page ? 'text-purple-400' : 'text-gray-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${item.icon}"></path>
                     </svg>
-                    <span class="text-sm ${item.active ? 'text-white' : 'text-gray-300'}">${item.label}</span>
+                    <span class="text-sm ${currentPage === item.page ? 'text-white' : 'text-gray-300'}">${item.label}</span>
                 `;
                 link.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -313,50 +608,18 @@
                 sidebar.classList.toggle('-translate-x-full');
             });
             
-            // Load initial page
-            setActivePage('dashboard');
-            
-            // Start realtime listeners
-            startRealtimeListeners();
+            // Load initial content
+            refreshCurrentPage();
         }
         
-        function getMenuItems() {
-            const baseItems = [
-                { page: 'dashboard', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', roles: ['LEADER', 'CS_LINE', 'CS_LIVECHAT', 'KKS', 'KASIR'] },
-                { page: 'izin', label: 'Izin Keluar', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', roles: ['LEADER', 'CS_LINE', 'CS_LIVECHAT', 'KKS', 'KASIR'] },
-                { page: 'absensi', label: 'Absensi', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', roles: ['LEADER', 'CS_LINE', 'CS_LIVECHAT', 'KKS', 'KASIR'] },
-                { page: 'staff', label: 'Management Staff', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', roles: ['LEADER'] }
-            ];
-            
-            // Filter based on role
-            return baseItems.filter(item => item.roles.includes(currentUserRole));
-        }
-        
-        function setActivePage(page) {
-            const content = document.getElementById('main-content');
-            
-            switch(page) {
-                case 'dashboard':
-                    renderDashboardContent(content);
-                    break;
-                case 'izin':
-                    renderIzinContent(content);
-                    break;
-                case 'absensi':
-                    renderAbsensiContent(content);
-                    break;
-                case 'staff':
-                    renderStaffManagement(content);
-                    break;
-            }
-        }
-        
-        function renderDashboardContent(container) {
-            const onlineCount = staffList.filter(s => s.online).length;
+        function renderDashboardContent() {
+            const onlineCount = staffList.filter(s => s.online && s.isRegistered !== false).length;
             const izinCount = staffList.filter(s => s.izinStatus === 'keluar').length;
-            const lateCount = staffList.filter(s => s.late).length;
+            const totalStaff = staffList.filter(s => s.isRegistered !== false).length;
+            const pendingStaff = staffList.filter(s => s.status === 'pending').length;
             const currentShift = getCurrentShift();
             
+            const container = document.getElementById('main-content');
             container.innerHTML = `
                 <div class="space-y-6">
                     <div>
@@ -364,14 +627,29 @@
                             Operational Dashboard
                         </h1>
                         <p class="text-gray-400 mt-2">Real-time monitoring & staff management system</p>
+                        <p class="text-purple-300 text-sm mt-1">${formatDateTime(new Date())} | Shift: ${currentShift}</p>
                     </div>
                     
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         ${createStatCard('Staff Online', onlineCount, 'from-green-500 to-emerald-500', 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z')}
                         ${createStatCard('Sedang Izin', izinCount, 'from-yellow-500 to-orange-500', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z')}
-                        ${createStatCard('Terlambat', lateCount, 'from-red-500 to-pink-500', 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z')}
-                        ${createStatCard('Shift Aktif', currentShift, 'from-purple-500 to-indigo-500', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z')}
+                        ${createStatCard('Total Staff', totalStaff, 'from-blue-500 to-cyan-500', 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z')}
+                        ${createStatCard('Izin Hari Ini', todayIzinCount + '/4', 'from-purple-500 to-indigo-500', 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z')}
                     </div>
+                    
+                    ${currentUserRole === 'LEADER' && pendingStaff > 0 ? `
+                        <div class="bg-yellow-500/10 backdrop-blur-xl rounded-2xl border border-yellow-500/20 p-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                    </svg>
+                                    <p class="text-yellow-400">📋 Ada ${pendingStaff} staff menunggu verifikasi login</p>
+                                </div>
+                                <button onclick="setActivePage('staff')" class="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-lg text-sm">Kelola</button>
+                            </div>
+                        </div>
+                    ` : ''}
                     
                     <div class="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-purple-500/20 p-6">
                         <h2 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
@@ -399,6 +677,42 @@
             renderStaffTable();
         }
         
+        function renderStaffTable() {
+            const tbody = document.getElementById('staff-table-body');
+            if (!tbody) return;
+            
+            const activeStaff = staffList.filter(s => s.isRegistered !== false && s.status !== 'pending');
+            
+            tbody.innerHTML = activeStaff.map(staff => `
+                <tr class="border-b border-purple-500/10 hover:bg-white/5 transition-colors">
+                    <td class="py-3 px-4 text-white font-medium">${staff.name || '-'}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-1 rounded-lg text-xs font-medium bg-purple-500/20 text-purple-300">${staff.role?.replace('_', ' ') || '-'}</span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-1 rounded-lg text-xs font-medium ${staff.status === 'aktif' ? 'bg-green-500/20 text-green-400' : staff.status === 'izin' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400'}">
+                            ${staff.status === 'aktif' ? 'Aktif' : staff.status === 'izin' ? 'Izin' : 'Offline'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        ${staff.izinStatus === 'keluar' ? 
+                            `<span class="text-yellow-400 text-sm flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse"></span>
+                                Sedang Izin
+                            </span>` : 
+                            `<span class="text-gray-500 text-sm">-</span>`
+                        }
+                    </td>
+                    <td class="py-3 px-4">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full ${staff.online ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}"></div>
+                            <span class="text-xs ${staff.online ? 'text-green-400' : 'text-gray-500'}">${staff.online ? 'Online' : 'Offline'}</span>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
         function createStatCard(title, value, gradient, iconPath) {
             return `
                 <div class="relative group">
@@ -418,41 +732,11 @@
             `;
         }
         
-        function renderStaffTable() {
-            const tbody = document.getElementById('staff-table-body');
-            if (!tbody) return;
-            
-            tbody.innerHTML = staffList.map(staff => `
-                <tr class="border-b border-purple-500/10 hover:bg-white/5 transition-colors">
-                    <td class="py-3 px-4 text-white">${staff.name || '-'}</td>
-                    <td class="py-3 px-4">
-                        <span class="px-2 py-1 rounded-lg text-xs font-medium bg-purple-500/20 text-purple-300">${staff.role?.replace('_', ' ') || '-'}</span>
-                    </td>
-                    <td class="py-3 px-4">
-                        <span class="px-2 py-1 rounded-lg text-xs font-medium ${staff.status === 'aktif' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}">
-                            ${staff.status || 'aktif'}
-                        </span>
-                    </td>
-                    <td class="py-3 px-4">
-                        ${staff.izinStatus === 'keluar' ? 
-                            `<span class="text-yellow-400 text-sm">Sedang Izin</span>` : 
-                            `<span class="text-gray-500 text-sm">-</span>`
-                        }
-                    </td>
-                    <td class="py-3 px-4">
-                        <div class="flex items-center gap-2">
-                            <div class="w-2 h-2 rounded-full ${staff.online ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}"></div>
-                            <span class="text-xs ${staff.online ? 'text-green-400' : 'text-gray-500'}">${staff.online ? 'Online' : 'Offline'}</span>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-        }
-        
-        function renderIzinContent(container) {
+        function renderIzinContent() {
             const canCreateIzin = currentUserRole !== 'LEADER' && !activeIzin && todayIzinCount < 4;
-            const validationErrors = getValidationErrors();
+            const sudahAbsen = currentUserData?.absenMasuk;
             
+            const container = document.getElementById('main-content');
             container.innerHTML = `
                 <div class="max-w-4xl mx-auto">
                     <div class="mb-8">
@@ -462,7 +746,15 @@
                         <p class="text-gray-400 mt-2">Keluar kantor sementara dengan izin</p>
                     </div>
                     
-                    ${activeIzin ? `
+                    ${currentUserRole === 'LEADER' ? `
+                        <div class="mb-6 bg-yellow-500/10 backdrop-blur-xl rounded-2xl border border-yellow-500/20 p-6 text-center">
+                            <svg class="w-12 h-12 text-yellow-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            <h3 class="text-yellow-400 font-bold text-lg mb-2">Akses Terbatas</h3>
+                            <p class="text-gray-400">Leader tidak dapat membuat izin keluar. Fitur ini hanya untuk staff operasional.</p>
+                        </div>
+                    ` : activeIzin ? `
                         <div class="mb-6 bg-gradient-to-r from-purple-600/20 to-pink-600/20 backdrop-blur-xl rounded-2xl border border-purple-500/20 p-6">
                             <div class="flex items-center justify-between flex-wrap gap-4">
                                 <div class="flex items-center gap-4">
@@ -484,16 +776,16 @@
                         </div>
                     ` : `
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                            <button id="izin-merokok" class="group relative overflow-hidden rounded-2xl p-6 bg-gray-900/50 backdrop-blur-xl border border-purple-500/20 hover:border-purple-500/50 transition-all">
-                                <svg class="w-10 h-10 text-purple-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <button id="izin-merokok" class="group relative overflow-hidden rounded-2xl p-6 bg-gray-900/50 backdrop-blur-xl border border-purple-500/20 hover:border-purple-500/50 hover:scale-105 transition-all">
+                                <svg class="w-12 h-12 text-purple-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v3m4 2a4 4 0 11-8 0 4 4 0 018 0zM6 18h12M6 18v2h12v-2"></path>
                                 </svg>
                                 <h3 class="text-xl font-bold text-white mb-2">Izin Merokok</h3>
                                 <p class="text-gray-300">Durasi: 20 menit</p>
                             </button>
                             
-                            <button id="izin-tidak-merokok" class="group relative overflow-hidden rounded-2xl p-6 bg-gray-900/50 backdrop-blur-xl border border-purple-500/20 hover:border-purple-500/50 transition-all">
-                                <svg class="w-10 h-10 text-purple-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <button id="izin-tidak-merokok" class="group relative overflow-hidden rounded-2xl p-6 bg-gray-900/50 backdrop-blur-xl border border-purple-500/20 hover:border-purple-500/50 hover:scale-105 transition-all">
+                                <svg class="w-12 h-12 text-purple-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
                                 <h3 class="text-xl font-bold text-white mb-2">Izin Tidak Merokok</h3>
@@ -502,35 +794,32 @@
                         </div>
                     `}
                     
-                    ${validationErrors.length > 0 && !activeIzin ? `
+                    ${!sudahAbsen && !activeIzin && currentUserRole !== 'LEADER' ? `
                         <div class="mb-6 bg-red-500/10 backdrop-blur-xl rounded-2xl border border-red-500/20 p-4">
-                            <div class="flex items-start gap-3">
-                                <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="flex items-center gap-3">
+                                <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                                 </svg>
-                                <div>
-                                    <p class="text-red-400 font-medium mb-2">Validasi Gagal:</p>
-                                    <ul class="text-red-300 text-sm space-y-1">
-                                        ${validationErrors.map(err => `<li>• ${err}</li>`).join('')}
-                                    </ul>
-                                </div>
+                                <p class="text-red-400">⚠️ Anda belum absen masuk! Silakan absen terlebih dahulu untuk membuat izin.</p>
                             </div>
                         </div>
                     ` : ''}
                     
-                    <div class="mb-6 bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-purple-500/20 p-4">
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-400">Izin Hari Ini</span>
-                            <span class="font-bold text-lg ${todayIzinCount >= 4 ? 'text-red-400' : 'text-purple-400'}">${todayIzinCount}/4</span>
+                    ${!activeIzin && currentUserRole !== 'LEADER' ? `
+                        <div class="mb-6 bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-purple-500/20 p-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-400">Izin Hari Ini</span>
+                                <span class="font-bold text-lg ${todayIzinCount >= 4 ? 'text-red-400' : 'text-purple-400'}">${todayIzinCount}/4</span>
+                            </div>
+                            <div class="mt-2 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all" style="width: ${(todayIzinCount / 4) * 100}%"></div>
+                            </div>
                         </div>
-                        <div class="mt-2 h-2 bg-gray-700 rounded-full overflow-hidden">
-                            <div class="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all" style="width: ${(todayIzinCount / 4) * 100}%"></div>
-                        </div>
-                    </div>
+                    ` : ''}
                 </div>
             `;
             
-            if (!activeIzin) {
+            if (!activeIzin && currentUserRole !== 'LEADER' && sudahAbsen) {
                 document.getElementById('izin-merokok')?.addEventListener('click', () => createIzin('merokok', 20));
                 document.getElementById('izin-tidak-merokok')?.addEventListener('click', () => createIzin('tidak-merokok', 15));
             }
@@ -540,10 +829,11 @@
             }
         }
         
-        function renderAbsensiContent(container) {
-            const staffData = staffList.find(s => s.id === currentUser?.uid);
-            const sudahAbsen = staffData?.absenMasuk;
+        function renderAbsensiContent() {
+            const sudahAbsen = currentUserData?.absenMasuk;
+            const sudahPulang = currentUserData?.absenPulang;
             
+            const container = document.getElementById('main-content');
             container.innerHTML = `
                 <div class="max-w-2xl mx-auto">
                     <div class="mb-8">
@@ -556,25 +846,33 @@
                     <div class="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-purple-500/20 p-8 text-center">
                         <div class="mb-6">
                             <div class="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mx-auto shadow-lg shadow-purple-500/50">
-                                <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <img src="${currentUser?.photoURL || ''}" class="w-24 h-24 rounded-full object-cover" onerror="this.style.display='none'">
+                                <svg class="w-12 h-12 text-white ${currentUser?.photoURL ? 'hidden' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                                 </svg>
                             </div>
-                            <h2 class="text-2xl font-bold text-white mt-4">${staffData?.name || currentUserData?.name}</h2>
+                            <h2 class="text-2xl font-bold text-white mt-4">${currentUserData?.name || currentUser?.displayName}</h2>
                             <p class="text-purple-300 mt-1">${currentUserRole?.replace('_', ' ')}</p>
+                            <p class="text-gray-500 text-sm mt-1">${currentUser?.email}</p>
                         </div>
                         
                         <div class="space-y-4">
                             ${!sudahAbsen ? `
                                 <button id="absen-masuk" class="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl text-white font-bold hover:shadow-lg hover:shadow-green-500/50 transition-all">
-                                    Absen Masuk
+                                    ✅ Absen Masuk
                                 </button>
+                            ` : sudahPulang ? `
+                                <div class="p-4 bg-gray-500/20 rounded-xl">
+                                    <p class="text-green-400">✓ Sudah absen masuk pada ${formatDateTime(sudahAbsen)}</p>
+                                    <p class="text-blue-400 mt-2">✓ Sudah absen pulang pada ${formatDateTime(sudahPulang)}</p>
+                                    <p class="text-gray-400 text-sm mt-3">Terima kasih, sampai jumpa besok! 👋</p>
+                                </div>
                             ` : `
                                 <div class="p-4 bg-green-500/20 rounded-xl border border-green-500/20">
-                                    <p class="text-green-400">✓ Sudah absen masuk pada ${formatTimeHM(sudahAbsen)}</p>
+                                    <p class="text-green-400">✓ Sudah absen masuk pada ${formatDateTime(sudahAbsen)}</p>
                                 </div>
                                 <button id="absen-pulang" class="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl text-white font-bold hover:shadow-lg hover:shadow-purple-500/50 transition-all">
-                                    Absen Pulang
+                                    🏠 Absen Pulang
                                 </button>
                             `}
                         </div>
@@ -584,385 +882,181 @@
             
             if (!sudahAbsen) {
                 document.getElementById('absen-masuk')?.addEventListener('click', () => absenMasuk());
-            } else {
+            } else if (!sudahPulang) {
                 document.getElementById('absen-pulang')?.addEventListener('click', () => absenPulang());
             }
         }
         
-        function renderStaffManagement(container) {
+        function renderStaffManagement() {
+            const container = document.getElementById('main-content');
+            const pendingStaff = staffList.filter(s => s.status === 'pending');
+            const activeStaff = staffList.filter(s => s.isRegistered !== false && s.status !== 'pending');
+            
             container.innerHTML = `
                 <div>
                     <div class="mb-8">
                         <h1 class="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
                             Management Staff
                         </h1>
-                        <p class="text-gray-400 mt-2">Kelola data dan role staff</p>
+                        <p class="text-gray-400 mt-2">Daftarkan staff baru dengan email Gmail</p>
                     </div>
                     
-                    <div class="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-purple-500/20 p-6">
-                        <button id="add-staff-btn" class="mb-4 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg text-white text-sm font-medium hover:shadow-lg hover:shadow-purple-500/50 transition-all">
-                            + Tambah Staff
+                    <!-- Form Registrasi Staff Baru -->
+                    <div class="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-purple-500/20 p-6 mb-6">
+                        <h2 class="text-xl font-semibold text-white mb-4">📝 Daftarkan Staff Baru</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <input type="email" id="register-email" placeholder="Email Gmail" class="px-4 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:border-purple-500">
+                            <input type="text" id="register-name" placeholder="Nama Lengkap" class="px-4 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:border-purple-500">
+                            <select id="register-role" class="px-4 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:border-purple-500">
+                                <option value="KASIR">KASIR</option>
+                                <option value="CS_LINE">CS LINE</option>
+                                <option value="CS_LIVECHAT">CS LIVECHAT</option>
+                                <option value="KKS">KKS</option>
+                            </select>
+                        </div>
+                        <button id="register-staff-btn" class="mt-4 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg text-white font-medium hover:shadow-lg transition-all">
+                            + Daftarkan Staff
                         </button>
-                        
+                    </div>
+                    
+                    <!-- Staff Menunggu Verifikasi -->
+                    ${pendingStaff.length > 0 ? `
+                        <div class="bg-yellow-500/10 backdrop-blur-xl rounded-2xl border border-yellow-500/20 p-6 mb-6">
+                            <h2 class="text-xl font-semibold text-yellow-400 mb-4">⏳ Staff Menunggu Verifikasi</h2>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead>
+                                        <tr class="border-b border-yellow-500/20">
+                                            <th class="text-left py-3 px-4 text-gray-400">Email</th>
+                                            <th class="text-left py-3 px-4 text-gray-400">Nama</th>
+                                            <th class="text-left py-3 px-4 text-gray-400">Role</th>
+                                            <th class="text-left py-3 px-4 text-gray-400">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${pendingStaff.map(staff => `
+                                            <tr class="border-b border-yellow-500/10">
+                                                <td class="py-3 px-4 text-gray-300">${staff.email}</td>
+                                                <td class="py-3 px-4 text-white">${staff.name}</td>
+                                                <td class="py-3 px-4"><span class="px-2 py-1 rounded-lg text-xs bg-purple-500/20 text-purple-300">${staff.role?.replace('_', ' ')}</span></td>
+                                                <td class="py-3 px-4">
+                                                    <button onclick="window.deleteStaff('${staff.id}')" class="text-red-400 hover:text-red-300 text-sm">Hapus</button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <!-- Staff Aktif -->
+                    <div class="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-purple-500/20 p-6">
+                        <h2 class="text-xl font-semibold text-white mb-4">✅ Staff Aktif</h2>
                         <div class="overflow-x-auto">
                             <table class="w-full">
                                 <thead>
                                     <tr class="border-b border-purple-500/20">
-                                        <th class="text-left py-3 px-4 text-gray-400 font-medium">Nama</th>
-                                        <th class="text-left py-3 px-4 text-gray-400 font-medium">Email</th>
-                                        <th class="text-left py-3 px-4 text-gray-400 font-medium">Role</th>
-                                        <th class="text-left py-3 px-4 text-gray-400 font-medium">Aksi</th>
-                                    </tr>
+                                        <th class="text-left py-3 px-4 text-gray-400">Nama</th>
+                                        <th class="text-left py-3 px-4 text-gray-400">Email</th>
+                                        <th class="text-left py-3 px-4 text-gray-400">Role</th>
+                                        <th class="text-left py-3 px-4 text-gray-400">Status</th>
+                                        <th class="text-left py-3 px-4 text-gray-400">Aksi</th>
+                                     </tr>
                                 </thead>
-                                <tbody id="staff-management-body"></tbody>
+                                <tbody>
+                                    ${activeStaff.map(staff => `
+                                        <tr class="border-b border-purple-500/10">
+                                            <td class="py-3 px-4 text-white">${staff.name || '-'}</td>
+                                            <td class="py-3 px-4 text-gray-300">${staff.email || '-'}</td>
+                                            <td class="py-3 px-4"><span class="px-2 py-1 rounded-lg text-xs bg-purple-500/20 text-purple-300">${staff.role?.replace('_', ' ')}</span></td>
+                                            <td class="py-3 px-4">
+                                                <span class="px-2 py-1 rounded-lg text-xs ${staff.online ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}">
+                                                    ${staff.online ? 'Online' : 'Offline'}
+                                                </span>
+                                            </td>
+                                            <td class="py-3 px-4">
+                                                <button onclick="window.updateStaffRole('${staff.id}', prompt('Role baru:'))" class="text-purple-400 hover:text-purple-300 mr-2 text-sm">Edit Role</button>
+                                                <button onclick="window.deleteStaff('${staff.id}')" class="text-red-400 hover:text-red-300 text-sm">Hapus</button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
             `;
             
-            renderStaffManagementTable();
-            
-            document.getElementById('add-staff-btn')?.addEventListener('click', () => {
-                const name = prompt('Nama staff:');
-                const email = prompt('Email staff:');
-                const password = prompt('Password sementara:');
-                const role = prompt('Role (LEADER/CS_LINE/CS_LIVECHAT/KKS/KASIR):');
+            document.getElementById('register-staff-btn')?.addEventListener('click', () => {
+                const email = document.getElementById('register-email').value;
+                const name = document.getElementById('register-name').value;
+                const role = document.getElementById('register-role').value;
+                registerStaff(email, name, role);
                 
-                if (name && email && password && role) {
-                    addStaff({ name, email, password, role });
-                }
+                // Clear form
+                document.getElementById('register-email').value = '';
+                document.getElementById('register-name').value = '';
             });
         }
         
-        function renderStaffManagementTable() {
-            const tbody = document.getElementById('staff-management-body');
-            if (!tbody) return;
-            
-            tbody.innerHTML = staffList.map(staff => `
-                <tr class="border-b border-purple-500/10">
-                    <td class="py-3 px-4 text-white">${staff.name || '-'}</td>
-                    <td class="py-3 px-4 text-gray-300">${staff.email || '-'}</td>
-                    <td class="py-3 px-4">
-                        <span class="px-2 py-1 rounded-lg text-xs font-medium bg-purple-500/20 text-purple-300">${staff.role?.replace('_', ' ') || '-'}</span>
-                    </td>
-                    <td class="py-3 px-4">
-                        <button onclick="editStaff('${staff.id}')" class="text-purple-400 hover:text-purple-300 mr-2">Edit</button>
-                        <button onclick="deleteStaff('${staff.id}')" class="text-red-400 hover:text-red-300">Hapus</button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-        
-        // Business Logic Functions
-        async function createIzin(type, duration) {
-            const staffData = staffList.find(s => s.id === currentUser?.uid);
-            
-            // Validations
-            if (!staffData?.absenMasuk) {
-                showNotification('Anda belum absen masuk!', 'error');
-                return;
-            }
-            
-            if (todayIzinCount >= 4) {
-                showNotification('Batas izin harian telah tercapai (4/4)!', 'error');
-                return;
-            }
-            
-            // Check minimum staff requirement
-            const sameRoleStaff = staffList.filter(s => s.role === staffData?.role && s.online && !s.izinStatus);
-            const minRequirements = { KASIR: 3, CS_LINE: 2, CS_LIVECHAT: 2, KKS: 2 };
-            const minRequired = minRequirements[staffData?.role];
-            
-            if (minRequired && sameRoleStaff.length < minRequired) {
-                showNotification(`Minimal ${minRequired} staff ${staffData?.role} harus tetap aktif!`, 'error');
-                return;
-            }
-            
-            const endTime = new Date();
-            endTime.setMinutes(endTime.getMinutes() + duration);
-            
-            try {
-                const izinData = {
-                    staffId: currentUser.uid,
-                    staffName: staffData?.name,
-                    role: staffData?.role,
-                    type: type,
-                    duration: duration,
-                    startTime: serverTimestamp(),
-                    endTime: endTime,
-                    date: new Date().toISOString().split('T')[0],
-                    status: 'active',
-                    late: false
-                };
-                
-                const docRef = await addDoc(collection(db, 'izin'), izinData);
-                
-                // Update staff status
-                const staffRef = doc(db, 'staff', currentUser.uid);
-                await updateDoc(staffRef, {
-                    izinStatus: 'keluar',
-                    status: 'izin',
-                    izinStart: new Date(),
-                    izinEnd: endTime
-                });
-                
-                showNotification(`Izin ${type === 'merokok' ? 'Merokok' : 'Tidak Merokok'} berhasil dibuat!`, 'success');
-                playSound('success');
-                
-                // Refresh data
-                await loadStaffData();
-                
-            } catch (error) {
-                console.error('Error:', error);
-                showNotification('Gagal membuat izin', 'error');
-            }
-        }
-        
-        async function absenMasuk() {
-            try {
-                const staffRef = doc(db, 'staff', currentUser.uid);
-                await updateDoc(staffRef, {
-                    absenMasuk: new Date(),
-                    status: 'aktif',
-                    online: true
-                });
-                
-                showNotification('Absen masuk berhasil!', 'success');
-                playSound('success');
-                await loadStaffData();
-                setActivePage('dashboard');
-            } catch (error) {
-                showNotification('Gagal absen masuk', 'error');
-            }
-        }
-        
-        async function absenPulang() {
-            try {
-                const staffRef = doc(db, 'staff', currentUser.uid);
-                await updateDoc(staffRef, {
-                    absenPulang: new Date(),
-                    online: false
-                });
-                
-                showNotification('Absen pulang berhasil!', 'success');
-                await loadStaffData();
-                setActivePage('dashboard');
-            } catch (error) {
-                showNotification('Gagal absen pulang', 'error');
-            }
-        }
-        
-        async function addStaff(data) {
-            try {
-                // This would typically create auth user first, then staff doc
-                const staffRef = doc(db, 'staff', Date.now().toString());
-                await setDoc(staffRef, {
-                    name: data.name,
-                    email: data.email,
-                    role: data.role,
-                    status: 'aktif',
-                    online: false,
-                    createdAt: serverTimestamp()
-                });
-                
-                showNotification('Staff berhasil ditambahkan!', 'success');
-                await loadStaffData();
-            } catch (error) {
-                showNotification('Gagal menambahkan staff', 'error');
-            }
-        }
-        
-        window.editStaff = async (staffId) => {
-            const newRole = prompt('Role baru (LEADER/CS_LINE/CS_LIVECHAT/KKS/KASIR):');
-            if (newRole) {
-                try {
-                    const staffRef = doc(db, 'staff', staffId);
-                    await updateDoc(staffRef, { role: newRole });
-                    showNotification('Role staff berhasil diupdate!', 'success');
-                    await loadStaffData();
-                } catch (error) {
-                    showNotification('Gagal mengupdate role', 'error');
-                }
-            }
-        };
-        
-        window.deleteStaff = async (staffId) => {
-            if (confirm('Yakin ingin menghapus staff ini?')) {
-                try {
-                    await deleteDoc(doc(db, 'staff', staffId));
-                    showNotification('Staff berhasil dihapus!', 'success');
-                    await loadStaffData();
-                } catch (error) {
-                    showNotification('Gagal menghapus staff', 'error');
-                }
-            }
-        };
-        
-        function getCurrentShift() {
-            const hour = new Date().getHours();
-            if (hour >= 6 && hour < 14) return 'Pagi';
-            if (hour >= 14 && hour < 22) return 'Sore';
-            return 'Malam';
-        }
-        
-        function getValidationErrors() {
-            const errors = [];
-            const staffData = staffList.find(s => s.id === currentUser?.uid);
-            
-            if (!staffData?.absenMasuk) {
-                errors.push('Anda belum absen masuk');
-            }
-            
-            if (todayIzinCount >= 4) {
-                errors.push('Batas izin harian telah tercapai');
-            }
-            
-            if (activeIzin) {
-                errors.push('Anda sedang dalam status izin');
-            }
-            
-            return errors;
-        }
-        
-        function updateCountdownDisplay() {
-            if (activeIzin && activeIzin.endTime) {
-                const now = new Date();
-                const end = new Date(activeIzin.endTime);
-                const diff = Math.max(0, Math.floor((end - now) / 1000));
-                
-                const timer = document.getElementById('countdown-timer');
-                if (timer) timer.textContent = formatTime(diff);
-                
-                if (diff <= 0 && countdownInterval) {
-                    clearInterval(countdownInterval);
-                    handleIzinTimeout();
-                }
-            }
-        }
-        
-        async function handleIzinTimeout() {
-            if (activeIzin) {
-                try {
-                    const izinRef = doc(db, 'izin', activeIzin.id);
-                    await updateDoc(izinRef, {
-                        status: 'completed',
-                        completedAt: serverTimestamp(),
-                        late: false
-                    });
-                    
-                    const staffRef = doc(db, 'staff', currentUser.uid);
-                    await updateDoc(staffRef, {
-                        izinStatus: null,
-                        status: 'aktif'
-                    });
-                    
-                    setActiveIzin(null);
-                    showNotification('Waktu izin telah selesai', 'info');
-                    await loadStaffData();
-                } catch (error) {
-                    console.error('Error:', error);
-                }
-            }
-        }
-        
-        // Data Loading Functions
-        async function loadStaffData() {
-            try {
-                const snapshot = await getDocs(collection(db, 'staff'));
-                staffList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                
-                // Update current user data
-                currentUserData = staffList.find(s => s.id === currentUser?.uid);
-                
-                // Check today's izin count
-                const today = new Date().toISOString().split('T')[0];
-                const izinSnapshot = await getDocs(query(
-                    collection(db, 'izin'),
-                    where('staffId', '==', currentUser?.uid),
-                    where('date', '==', today)
-                ));
-                todayIzinCount = izinSnapshot.size;
-                
-                // Check active izin
-                const activeIzinSnapshot = await getDocs(query(
-                    collection(db, 'izin'),
-                    where('staffId', '==', currentUser?.uid),
-                    where('status', '==', 'active')
-                ));
-                
-                if (!activeIzinSnapshot.empty) {
-                    const izinDoc = activeIzinSnapshot.docs[0];
-                    setActiveIzin({ id: izinDoc.id, ...izinDoc.data() });
-                    
-                    if (countdownInterval) clearInterval(countdownInterval);
-                    countdownInterval = setInterval(() => updateCountdownDisplay(), 1000);
-                } else {
-                    setActiveIzin(null);
-                    if (countdownInterval) clearInterval(countdownInterval);
-                }
-                
-                // Refresh UI if on relevant pages
-                const currentContent = document.getElementById('main-content');
-                if (currentContent && currentContent.innerHTML.includes('Daftar Staff')) {
-                    renderStaffTable();
-                }
-                
-                if (currentContent && currentContent.innerHTML.includes('Management Staff')) {
-                    renderStaffManagementTable();
-                }
-                
-            } catch (error) {
-                console.error('Error loading staff:', error);
-            }
-        }
-        
-        function setActiveIzin(izin) {
-            activeIzin = izin;
-        }
-        
         function startRealtimeListeners() {
-            // Staff listener
             if (unsubscribeStaff) unsubscribeStaff();
             
             unsubscribeStaff = onSnapshot(collection(db, 'staff'), (snapshot) => {
                 staffList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 currentUserData = staffList.find(s => s.id === currentUser?.uid);
-                
-                // Update UI
-                const currentContent = document.getElementById('main-content');
-                if (currentContent && currentContent.innerHTML.includes('Daftar Staff')) {
-                    renderStaffTable();
-                }
+                refreshCurrentPage();
             });
         }
         
-        // Auth State Listener
+        // Make functions global for onclick
+        window.updateStaffRole = updateStaffRole;
+        window.deleteStaff = deleteStaff;
+        
+        // ============ AUTH STATE LISTENER ============
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentUser = user;
                 
-                // Load user role from Firestore
+                // Cek apakah staff sudah terdaftar
                 const userDoc = await getDoc(doc(db, 'staff', user.uid));
                 if (userDoc.exists()) {
                     currentUserData = userDoc.data();
                     currentUserRole = currentUserData.role;
+                    await loadStaffData();
+                    startRealtimeListeners();
+                    renderDashboard();
+                } else {
+                    // Cek apakah email sudah didaftarkan (pending)
+                    const pendingStaff = staffList.find(s => s.email === user.email && s.status === 'pending');
+                    if (pendingStaff) {
+                        // Verifikasi staff
+                        const verified = await verifyStaffRegistration(user.uid, user.email, user.displayName);
+                        if (verified) {
+                            await loadStaffData();
+                            startRealtimeListeners();
+                            renderDashboard();
+                        } else {
+                            await signOut(auth);
+                        }
+                    } else {
+                        showNotification('Email Anda belum didaftarkan oleh Leader. Silakan hubungi Leader.', 'error');
+                        await signOut(auth);
+                    }
                 }
-                
-                await loadStaffData();
-                renderApp();
             } else {
                 currentUser = null;
                 currentUserRole = null;
                 currentUserData = null;
                 if (unsubscribeStaff) unsubscribeStaff();
                 if (countdownInterval) clearInterval(countdownInterval);
-                renderApp();
+                renderLogin();
             }
         });
         
         // Initial render
-        renderApp();
+        renderLogin();
     </script>
     
     <style>
@@ -998,12 +1092,8 @@
         }
         
         @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.5;
-            }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
         
         .animate-pulse {
