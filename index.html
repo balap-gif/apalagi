@@ -13,7 +13,11 @@ tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','sans-serif'],mono:['J
 <style>
 *{scrollbar-width:thin;scrollbar-color:rgba(0,229,255,.2) transparent}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,229,255,.25);border-radius:9px}
-body{background:#04060f;font-family:'Inter',sans-serif;overflow:hidden}
+body{
+    background: linear-gradient(rgba(4, 6, 15, 0.88), rgba(4, 6, 15, 0.94)), url('https://cdn.areabermain.club/assets/cdn/az5/2026/03/02/20260302/997f37bf3bc90016a5e32ae52406c5c4/background-web-hokbentoto-1.jpg');
+    background-size: cover; background-position: center; background-attachment: fixed;
+    font-family:'Inter',sans-serif; overflow:hidden;
+}
 .glass{background:rgba(10,14,26,.75);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 .glass-s{background:rgba(10,14,26,.92);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px)}
 .neon-box{box-shadow:0 0 15px rgba(0,229,255,.08),inset 0 0 15px rgba(0,229,255,.03);border:1px solid rgba(0,229,255,.12)}
@@ -141,10 +145,10 @@ input,select,textarea{outline:none}
 <div class="max-w-3xl">
 <div id="izinActive" class="hidden glass-s neon-box p-6 rounded-2xl mb-6 text-center shadow-[0_0_40px_rgba(0,229,255,.08)]">
 <div class="w-14 h-14 rounded-full bg-cb-accent/10 border border-cb-accent/30 flex items-center justify-center mx-auto mb-3"><i data-lucide="timer" class="w-7 h-7 text-cb-accent animate-pulse"></i></div>
-<p class="text-cb-accent font-bold text-lg neon-glow font-mono uppercase mb-1">Sedang Izin Keluar</p>
+<p class="text-cb-accent font-bold text-lg neon-glow font-mono uppercase mb-1">Sedang Izin</p>
 <p class="text-gray-400 text-sm mb-3">Tipe: <span id="izTipe" class="text-white font-semibold"></span> | Batas: <span id="izBatas" class="text-white font-bold"></span></p>
 <div id="izCD" class="text-4xl font-mono font-bold text-cb-accent neon-glow mb-4">--:--</div>
-<button onclick="endIzin()" class="bg-cb-success hover:bg-green-400 text-cb-bg px-8 py-3 rounded-xl font-bold text-lg transition shadow-lg shadow-green-900/30 flex items-center gap-2 mx-auto"><i data-lucide="log-in" class="w-5 h-5"></i> Kembali Sekarang</button>
+<button onclick="endIzin()" class="bg-cb-danger hover:bg-red-500 text-white px-10 py-3 rounded-xl font-bold text-lg transition shadow-lg shadow-red-900/30 flex items-center justify-center gap-2 mx-auto">END</button>
 </div>
 <!-- Leader: End siapapun -->
 <div id="izinAdmin" class="hidden glass leader-bar p-4 rounded-xl mb-6">
@@ -152,12 +156,20 @@ input,select,textarea{outline:none}
 <div id="izinAdminList" class="space-y-2"></div>
 </div>
 <div class="glass neon-box p-6 rounded-2xl">
-<h3 class="text-lg font-bold text-white flex items-center gap-2 mb-5"><i data-lucide="scan-line" class="w-5 h-5 text-cb-accent"></i> Pengajuan Izin Keluar</h3>
+<h3 class="text-lg font-bold text-white flex items-center gap-2 mb-5"><i data-lucide="scan-line" class="w-5 h-5 text-cb-accent"></i> Pengajuan Izin</h3>
 <div id="izinWarn" class="hidden bg-red-900/20 border border-red-500/30 p-4 rounded-xl mb-5 text-sm text-red-300 flex items-center gap-3"><i data-lucide="shield-alert" class="w-5 h-5 flex-shrink-0"></i><span id="izinWarnTxt"></span></div>
 <div class="bg-cb-light/40 border border-cb-border p-4 rounded-xl mb-5 flex justify-between items-center text-sm"><span class="text-gray-400"><i data-lucide="info" class="w-4 h-4 text-cb-accent inline mr-1"></i> Sisa izin hari ini:</span><span class="font-mono font-bold text-cb-accent text-lg"><span id="sisaIzin">4</span>/4</span></div>
 <div class="grid grid-cols-2 gap-4">
-<button id="btnMerokok" onclick="ajukanIzin('merokok')" disabled class="glass p-5 rounded-xl text-left border border-white/5 hover:border-cb-accent/40 transition disabled:opacity-30 disabled:cursor-not-allowed card-h group"><i data-lucide="cigarette" class="w-8 h-8 mb-2 text-blue-400 group-hover:text-cb-accent transition"></i><h4 class="font-bold text-white">Merokok</h4><p class="text-gray-500 text-xs mt-1">Maks 20 menit</p></button>
-<button id="btnNonRokok" onclick="ajukanIzin('tidak_merokok')" disabled class="glass p-5 rounded-xl text-left border border-white/5 hover:border-cb-purple/40 transition disabled:opacity-30 disabled:cursor-not-allowed card-h group"><i data-lucide="coffee" class="w-8 h-8 mb-2 text-purple-400 group-hover:text-cb-purple transition"></i><h4 class="font-bold text-white">Non-Rokok</h4><p class="text-gray-500 text-xs mt-1">Maks 15 menit</p></button>
+<button id="btnKeluar" onclick="ajukanIzin('keluar')" disabled class="glass p-5 rounded-xl text-center border border-white/5 hover:border-cb-accent/40 transition disabled:opacity-30 disabled:cursor-not-allowed card-h group flex flex-col items-center justify-center">
+<h4 class="font-bold text-white text-lg">IZIN KELUAR</h4>
+<p class="text-gray-400 text-xs mt-1">Durasi 20 Menit</p>
+<div class="mt-3 bg-cb-accent/20 text-cb-accent px-5 py-1.5 rounded-lg text-xs font-bold tracking-widest">START</div>
+</button>
+<button id="btnKamar" onclick="ajukanIzin('kamar_mandi')" disabled class="glass p-5 rounded-xl text-center border border-white/5 hover:border-cb-purple/40 transition disabled:opacity-30 disabled:cursor-not-allowed card-h group flex flex-col items-center justify-center">
+<h4 class="font-bold text-white text-lg">IZIN KAMAR MANDI</h4>
+<p class="text-gray-400 text-xs mt-1">Durasi 15 Menit</p>
+<div class="mt-3 bg-cb-purple/20 text-cb-purple px-5 py-1.5 rounded-lg text-xs font-bold tracking-widest">START</div>
+</button>
 </div></div></div>
 </div>
 
@@ -192,10 +204,15 @@ input,select,textarea{outline:none}
 
 <!-- === SHIFT === -->
 <div id="tab-shift" class="tab-c hidden fade-up">
-<div class="grid grid-cols-3 gap-4 mb-6">
-<div class="glass p-5 rounded-xl text-center border-l-4 border-sky-400"><i data-lucide="sun" class="w-6 h-6 text-sky-400 mx-auto mb-2"></i><h4 class="font-bold text-sky-300">PAGI</h4><p class="text-xs text-gray-400 mt-1">07:45:00 - 17:45:00</p></div>
-<div class="glass p-5 rounded-xl text-center border-l-4 border-orange-400"><i data-lucide="cloud-sun" class="w-6 h-6 text-orange-400 mx-auto mb-2"></i><h4 class="font-bold text-orange-300">SORE</h4><p class="text-xs text-gray-400 mt-1">15:45:00 - 01:45:00</p></div>
-<div class="glass p-5 rounded-xl text-center border-l-4 border-indigo-400"><i data-lucide="moon" class="w-6 h-6 text-indigo-400 mx-auto mb-2"></i><h4 class="font-bold text-indigo-300">MALAM</h4><p class="text-xs text-gray-400 mt-1">21:45:00 - 07:45:00</p></div>
+<div id="shiftTimeCards" class="grid grid-cols-3 gap-4 mb-6"></div>
+<div id="shiftTimeMgr" class="hidden glass leader-bar p-5 rounded-2xl mb-6">
+<h4 class="text-cb-warn font-bold text-sm mb-3 flex items-center gap-2"><i data-lucide="crown" class="w-4 h-4"></i> Atur Waktu Shift (Manual)</h4>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+<div><label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">Pagi</label><input id="stPagi" class="w-full bg-cb-light/50 border border-cb-border p-2 rounded-lg text-white text-sm font-mono" placeholder="07:45:00 - 17:45:00"></div>
+<div><label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">Sore</label><input id="stSore" class="w-full bg-cb-light/50 border border-cb-border p-2 rounded-lg text-white text-sm font-mono" placeholder="15:45:00 - 01:45:00"></div>
+<div><label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">Malam</label><input id="stMalam" class="w-full bg-cb-light/50 border border-cb-border p-2 rounded-lg text-white text-sm font-mono" placeholder="21:45:00 - 07:45:00"></div>
+</div>
+<button onclick="saveShiftTimes()" class="mt-3 bg-cb-warn hover:bg-yellow-400 text-cb-bg px-5 py-2.5 rounded-lg font-bold text-sm transition">Simpan Waktu Shift</button>
 </div>
 <div id="shiftMgr" class="hidden glass leader-bar p-5 rounded-2xl mb-6">
 <h4 class="text-cb-warn font-bold text-sm mb-3 flex items-center gap-2"><i data-lucide="crown" class="w-4 h-4"></i> Atur Shift Staff</h4>
@@ -365,13 +382,13 @@ let allUsers=[],allPermits=[],allKas=[],allRekap=[],allLembur=[],allPgj=[],allCh
 let trTimer=null,trStart=0,trInt=null,trTarget='',trOn=false;
 let legCnt=0;
 
+let shiftTimes = { pagi: '07:45:00 - 17:45:00', sore: '15:45:00 - 01:45:00', malam: '21:45:00 - 07:45:00' };
+
 const today=()=>new Date().toISOString().split('T')[0];
 const $=id=>document.getElementById(id);
 const fmtN=n=>new Intl.NumberFormat('id-ID').format(n);
-const fmtT=ms=>{if(ms<=0)return'00:00';const m=Math.floor(ms/60000),s=Math.floor((diff%60000)/1000);return`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`};
 const fmtCD=ms=>{if(ms<=0)return'00:00';const m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000);return`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`};
 
-// === PERM DEFAULT ===
 const DEFAULT_PERMS={
 'CS LINE':['dashboard','jamIzin','absensi','pengajuan','shift','jobdesk','livechat','pengumuman','rekap','lembur','parlay','typerace'],
 'CS LIVECHAT':['dashboard','jamIzin','absensi','pengajuan','shift','jobdesk','livechat','pengumuman','typerace'],
@@ -398,20 +415,10 @@ const ALL_MENUS=[
 {id:'riwayat',label:'Riwayat Aktivitas',icon:'history'}
 ];
 
-function getPermMap(){
-    const raw=localStorage.getItem('opsPerms');
-    return raw?JSON.parse(raw):{...DEFAULT_PERMS};
-}
+function getPermMap(){const raw=localStorage.getItem('opsPerms');return raw?JSON.parse(raw):{...DEFAULT_PERMS}}
 function savePermMap(p){localStorage.setItem('opsPerms',JSON.stringify(p))}
-function getUserMenus(){
-    if(!CU)return[];
-    if(CU.role==='LEADER')return ALL_MENUS;
-    const p=getPermMap();
-    const allowed=p[CU.role]||[];
-    return ALL_MENUS.filter(m=>allowed.includes(m.id));
-}
+function getUserMenus(){if(!CU)return[];if(CU.role==='LEADER')return ALL_MENUS;const p=getPermMap();const allowed=p[CU.role]||[];return ALL_MENUS.filter(m=>allowed.includes(m.id))}
 
-// === TOAST ===
 function toast(msg,type='info'){
     const c=$('toastBox'),colors={success:'border-cb-success bg-green-900/40',error:'border-cb-danger bg-red-900/40',info:'border-cb-accent bg-cyan-900/30',warning:'border-cb-warn bg-yellow-900/30'};
     const icons={success:'check-circle',error:'x-circle',info:'info',warning:'alert-triangle'};
@@ -426,7 +433,6 @@ let cfmCb=null;
 function showCfm(title,msg,cb){$('cfmTitle').textContent=title;$('cfmMsg').textContent=msg;cfmCb=cb;$('cfmYes').onclick=()=>{$('cfmModal').classList.add('hidden');if(cfmCb)cfmCb()};$('cfmModal').classList.remove('hidden')}
 window.cfmNo=()=>$('cfmModal').classList.add('hidden');
 
-// === AUTH ===
 window.doLogin=async()=>{
     const e=$('loginEmail').value.trim(),p=$('loginPass').value,err=$('loginErr'),txt=$('loginErrTxt');
     err.classList.add('hidden');if(!e||!p){txt.textContent='Isi email & password!';err.classList.remove('hidden');return}
@@ -458,7 +464,6 @@ onAuthStateChanged(auth,async user=>{
     }
 });
 
-// === SIDEBAR ===
 function buildSb(){
     const nav=$('sideNav');nav.innerHTML='';
     const menus=getUserMenus();
@@ -469,7 +474,6 @@ function buildSb(){
 }
 window.toggleMobSb=()=>{const sb=$('sidebar'),ov=$('mobOverlay');sb.classList.toggle('-translate-x-full');ov.classList.toggle('hidden')};
 
-// === ROUTING ===
 window.showTab=id=>{
     document.querySelectorAll('.tab-c').forEach(e=>e.classList.add('hidden'));
     document.querySelectorAll('.sb-item').forEach(e=>e.classList.remove('active'));
@@ -485,11 +489,9 @@ window.showTab=id=>{
     if(id==='roles')renderRoles();
     if(id==='riwayat')renderLogs();
     if(id==='users')renderUsers();
-    // Mobile close
     if(window.innerWidth<768){$('sidebar').classList.add('-translate-x-full');$('mobOverlay').classList.add('hidden')}
 };
 
-// === LISTENERS ===
 function initListeners(){
     onSnapshot(collection(db,'users'),snap=>{allUsers=[];snap.forEach(d=>allUsers.push({id:d.id,...d.data()}));updateStaffUI();fillSelects()});
     const tq=today();
@@ -506,6 +508,21 @@ function initListeners(){
     onSnapshot(collection(db,'jobdesk'),snap=>{allJD=[];snap.forEach(d=>allJD.push({id:d.id,...d.data()}));renderJD()});
     onSnapshot(collection(db,'announcements'),snap=>{allAnn=[];snap.forEach(d=>allAnn.push({id:d.id,...d.data()}));renderAnn();updateAnnBanner()});
     onSnapshot(collection(db,'activityLog'),snap=>{allLogs=[];snap.forEach(d=>allLogs.push({id:d.id,...d.data()}))});
+    
+    // Shift Times Listener
+    onSnapshot(doc(db,'settings','shifts'),snap=>{
+        if(snap.exists()){
+            shiftTimes = snap.data();
+            renderShiftCards();
+            if(CU?.role==='LEADER'){
+                $('stPagi').value = shiftTimes.pagi || '';
+                $('stSore').value = shiftTimes.sore || '';
+                $('stMalam').value = shiftTimes.malam || '';
+            }
+        } else {
+            renderShiftCards();
+        }
+    });
 }
 
 function fillSelects(){
@@ -513,7 +530,6 @@ function fillSelects(){
     ['shiftStaf','rekapStaf','lemburStaf'].forEach(id=>{if($(id))$(id).innerHTML=opts});
 }
 
-// === DASHBOARD ===
 function updateDash(){
     const now=new Date(),h=now.getHours();let on=0,ak=0,iz=0,tl=0,sh='-';
     if(h>=8&&h<16)sh='PAGI';else if(h>=16&&h<23)sh='SORE';else sh='MALAM';
@@ -530,10 +546,11 @@ function renderMon(){
     active.sort((a,b)=>(a.status==='lewat'?0:1)-(b.status==='lewat'?0:1));
     if(!active.length){h='<p class="text-gray-600 text-sm text-center py-6">Semua staff aktif</p>'}
     active.forEach(p=>{
+        const tipeLabel = p.tipe === 'keluar' ? 'Izin Keluar' : 'Izin Kamar Mandi';
         if(p.status==='lewat'){
-            h+=`<div class="bg-red-900/15 p-3 rounded-xl flex justify-between items-center danger-glow"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg bg-red-900/30 border border-red-500/30 flex items-center justify-center text-red-400 font-bold text-xs">${p.nama.charAt(0)}</div><div><p class="font-semibold text-red-400 text-sm">${p.nama} <span class="text-[9px] bg-red-500/20 px-1.5 py-0.5 rounded">TERLAMBAT</span></p><p class="text-[10px] text-gray-500">${p.role} • ${p.tipe==='merokok'?'Merokok':'Non-Rokok'}</p></div></div>${p.userId===CUID||CU?.role==='LEADER'?`<button onclick="forceEnd('${p.id}')" class="bg-cb-success text-cb-bg px-3 py-1.5 rounded-lg text-[10px] font-bold transition hover:bg-green-400">Kembalikan</button>`:''}</div>`;
+            h+=`<div class="bg-red-900/15 p-3 rounded-xl flex justify-between items-center danger-glow"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg bg-red-900/30 border border-red-500/30 flex items-center justify-center text-red-400 font-bold text-xs">${p.nama.charAt(0)}</div><div><p class="font-semibold text-red-400 text-sm">${p.nama} <span class="text-[9px] bg-red-500/20 px-1.5 py-0.5 rounded">TERLAMBAT</span></p><p class="text-[10px] text-gray-500">${p.role} • ${tipeLabel}</p></div></div>${p.userId===CUID||CU?.role==='LEADER'?`<button onclick="forceEnd('${p.id}')" class="bg-cb-danger text-white px-4 py-1.5 rounded-lg text-[10px] font-bold transition hover:bg-red-500">END</button>`:''}</div>`;
         }else{
-            h+=`<div class="bg-cb-light/20 p-3 rounded-xl flex justify-between items-center border border-white/5"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg bg-cb-accent/10 border border-cb-accent/30 flex items-center justify-center text-cb-accent font-bold text-xs">${p.nama.charAt(0)}</div><div><p class="font-semibold text-white text-sm">${p.nama}</p><p class="text-[10px] text-gray-500">${p.role} • ${p.tipe==='merokok'?'🚬':'☕'} ${p.tipe==='merokok'?'Merokok':'Non-Rokok'}</p></div></div><span id="cd-${p.id}" class="text-cb-accent font-mono font-bold text-sm"></span></div>`;
+            h+=`<div class="bg-cb-light/20 p-3 rounded-xl flex justify-between items-center border border-white/5"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg bg-cb-accent/10 border border-cb-accent/30 flex items-center justify-center text-cb-accent font-bold text-xs">${p.nama.charAt(0)}</div><div><p class="font-semibold text-white text-sm">${p.nama}</p><p class="text-[10px] text-gray-500">${p.role} • ${tipeLabel}</p></div></div><span id="cd-${p.id}" class="text-cb-accent font-mono font-bold text-sm"></span></div>`;
         }
     });
     $('monList').innerHTML=h;lucide.createIcons({nodes:[$('monList')]});startCD();
@@ -555,7 +572,9 @@ function renderStaffTbl(){
     if(q)list=list.filter(u=>u.nama.toLowerCase().includes(q));if(fr)list=list.filter(u=>u.role===fr);if(fs)list=list.filter(u=>u.shift===fs);
     let h='';list.forEach(u=>{
         const p=outMap[u.id];let st=`<span class="text-cb-success text-[10px] font-bold">AKTIF</span>`,iz='-';
-        if(p){if(p.status==='lewat'){st=`<span class="text-cb-danger text-[10px] font-bold animate-pulse">TERLAMBAT</span>`;iz=`<span class="text-red-400 text-[10px]">${p.tipe==='merokok'?'Merokok':'Non-Rokok'} (LEWAT)</span>`}else{st=`<span class="text-blue-400 text-[10px] font-bold">IZIN</span>`;const d=p.endTimeStamp.toDate()-new Date();iz=`<span class="text-blue-300 text-[10px]">${p.tipe==='merokok'?'Merokok':'Non-Rokok'} • ${d>0?fmtCD(d):'HABIS'}</span>`}}
+        if(p){
+            const tipeLabel = p.tipe === 'keluar' ? 'Izin Keluar' : 'Izin Kamar Mandi';
+            if(p.status==='lewat'){st=`<span class="text-cb-danger text-[10px] font-bold animate-pulse">TERLAMBAT</span>`;iz=`<span class="text-red-400 text-[10px]">${tipeLabel} (LEWAT)</span>`}else{st=`<span class="text-blue-400 text-[10px] font-bold">IZIN</span>`;const d=p.endTimeStamp.toDate()-new Date();iz=`<span class="text-blue-300 text-[10px]">${tipeLabel} • ${d>0?fmtCD(d):'HABIS'}</span>`}}
         const on=u.status==='online'?'<span class="w-2 h-2 rounded-full bg-cb-success inline-block shadow-[0_0_6px_rgba(0,230,118,.5)]"></span>':'<span class="w-2 h-2 rounded-full bg-gray-600 inline-block"></span>';
         h+=`<tr class="border-b border-cb-border/50 hover:bg-cb-light/20"><td class="p-3 font-medium text-white">${u.nama}</td><td class="p-3"><span class="bg-cb-accent/10 text-cb-accent px-1.5 py-0.5 rounded text-[10px] font-mono">${u.role}</span></td><td class="p-3 text-gray-400 text-[10px]">${u.jobdesk||'-'}</td><td class="p-3 text-[10px]">${u.shift||'-'}</td><td class="p-3">${st}</td><td class="p-3">${iz}</td><td class="p-3">${on}</td></tr>`;
     });$('staffTbody').innerHTML=h||'<tr><td colspan="7" class="text-center p-6 text-gray-600">-</td></tr>';
@@ -565,15 +584,14 @@ function updateStaffUI(){renderStaffTbl();renderShiftList();renderJDCards();upda
 
 // === IZIN ===
 async function checkIzin(){
-    const b1=$('btnMerokok'),b2=$('btnNonRokok'),sisa=$('sisaIzin'),warn=$('izinWarn'),wtxt=$('izinWarnTxt'),panel=$('izinActive'),admin=$('izinAdmin');
+    const b1=$('btnKeluar'),b2=$('btnKamar'),sisa=$('sisaIzin'),warn=$('izinWarn'),wtxt=$('izinWarnTxt'),panel=$('izinActive'),admin=$('izinAdmin');
     b1.disabled=true;b2.disabled=true;warn.classList.add('hidden');panel.classList.add('hidden');activePid=null;
     if(!CUID)return;
-    // Leader admin
-    if(CU?.role==='LEADER'){admin.classList.remove('hidden');const outP=allPermits.filter(p=>p.status==='aktif'||p.status==='lewat');let ah='';outP.forEach(p=>{ah+=`<div class="flex items-center justify-between bg-cb-light/30 p-2 rounded-lg"><span class="text-sm text-white">${p.nama} (${p.tipe==='merokok'?'Merokok':'Non-Rokok'}) — <span class="${p.status==='lewat'?'text-cb-danger':'text-blue-400'}">${p.status==='lewat'?'TERLAMBAT':'AKTIF'}</span></span><button onclick="forceEnd('${p.id}')" class="bg-cb-success text-cb-bg px-3 py-1 rounded text-[10px] font-bold hover:bg-green-400 transition">End</button></div>`});$('izinAdminList').innerHTML=ah||'<p class="text-gray-600 text-xs">Tidak ada staff izin</p>'}
+    if(CU?.role==='LEADER'){admin.classList.remove('hidden');const outP=allPermits.filter(p=>p.status==='aktif'||p.status==='lewat');let ah='';outP.forEach(p=>{const tL=p.tipe==='keluar'?'Izin Keluar':'Izin Kamar Mandi';ah+=`<div class="flex items-center justify-between bg-cb-light/30 p-2 rounded-lg"><span class="text-sm text-white">${p.nama} (${tL}) — <span class="${p.status==='lewat'?'text-cb-danger':'text-blue-400'}">${p.status==='lewat'?'TERLAMBAT':'AKTIF'}</span></span><button onclick="forceEnd('${p.id}')" class="bg-cb-danger text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-500 transition">END</button></div>`});$('izinAdminList').innerHTML=ah||'<p class="text-gray-600 text-xs">Tidak ada staff izin</p>'}
     else{admin.classList.add('hidden')}
     try{
         const t=today(),myActive=allPermits.filter(p=>p.userId===CUID&&(p.status==='aktif'||p.status==='lewat'));
-        if(myActive.length>0){const p=myActive[0];activePid=p.id;panel.classList.remove('hidden');$('izTipe').textContent=p.tipe==='merokok'?'Merokok':'Non-Rokok';$('izBatas').textContent=p.batasKembali;return}
+        if(myActive.length>0){const p=myActive[0];activePid=p.id;panel.classList.remove('hidden');$('izTipe').textContent=p.tipe==='keluar'?'Izin Keluar':'Izin Kamar Mandi';$('izBatas').textContent=p.batasKembali;return}
         const aSnap=await getDoc(doc(db,'absensi',CUID+'_'+t));
         if(CU.role!=='LEADER'){if(!aSnap.exists()||!aSnap.data().jamMasuk){wtxt.textContent='Anda belum absen masuk!';warn.classList.remove('hidden');sisa.textContent='0';return}if(aSnap.data().jamPulang){wtxt.textContent='Sudah absen pulang!';warn.classList.remove('hidden');sisa.textContent='0';return}}
         else{if(!aSnap.exists()){wtxt.textContent='Leader harap absen masuk dulu';warn.classList.remove('hidden');sisa.textContent='0';return}}
@@ -594,7 +612,7 @@ async function checkIzin(){
 window.ajukanIzin=async tipe=>{
     const t=today();if(allPermits.filter(p=>p.userId===CUID&&p.status==='aktif').length>0)return showWarn('Masih dalam izin!');
     if(allPermits.filter(p=>p.userId===CUID).length>=4)return showWarn('Batas izin harian tercapai (4x)!');
-    const dur=tipe==='merokok'?20:15,s=new Date(),e=new Date(s.getTime()+dur*60000);
+    const dur=tipe==='keluar'?20:15,s=new Date(),e=new Date(s.getTime()+dur*60000);
     try{await addDoc(collection(db,'permits'),{userId:CUID,nama:CU.nama,role:CU.role,tipe,durasi:dur,jamKeluar:s.toLocaleTimeString('id-ID'),batasKembali:e.toLocaleTimeString('id-ID'),endTimeStamp:e,status:'aktif',tanggal:t});
     addLog('IZIN_KELUAR',`${CU.nama} izin ${tipe} (${dur}m)`);toast('Izin diajukan!','success')}catch(e){toast(e.message,'error')}
 };
@@ -606,7 +624,6 @@ async function checkAbsen(){
     const t=today();try{const s=await getDoc(doc(db,'absensi',CUID+'_'+t)),bm=$('btnMasuk'),bp=$('btnPulang'),st=$('absenStatus');
     if(s.exists()){const d=s.data();bm.disabled=true;if(d.jamPulang){bp.disabled=true;st.innerHTML=`<i data-lucide="check-double" class="w-4 h-4 text-cb-success inline mr-1"></i> Selesai (Masuk: ${d.jamMasuk} | Pulang: ${d.jamPulang})`}else{bp.disabled=false;st.innerHTML=`<i data-lucide="check-circle" class="w-4 h-4 text-cb-accent inline mr-1"></i> Bekerja (Masuk: ${d.jamMasuk})`}}else{bm.disabled=false;bp.disabled=true;st.innerHTML='<i data-lucide="clock" class="w-4 h-4 text-gray-500 inline mr-1"></i> Belum absen'}
     lucide.createIcons({nodes:[st]});
-    // Leader admin
     if(CU?.role==='LEADER'){$('absenAdmin').classList.remove('hidden');const uSnap=await getDocs(collection(db,'absensi'));let ah='';allUsers.filter(u=>u.role!=='LEADER').forEach(u=>{const key=u.id+'_'+t;const aDoc=uSnap.docs.find(d=>d.id===key);const aData=aDoc?.data();const dot=u.status==='online'?'bg-cb-success':'bg-gray-600';
     ah+=`<div class="flex items-center justify-between bg-cb-light/20 p-2.5 rounded-lg border border-white/5"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full ${dot} inline-block"></span><span class="text-white text-sm">${u.nama}</span><span class="text-gray-500 text-[10px]">${u.role}</span></div><div class="text-[10px] text-gray-400">${aData?`M: ${aData.jamMasuk||'-'} | P: ${aData.jamPulang||'-'}`:'Belum absen'}</div></div>`});
     $('absenList').innerHTML=ah}else{$('absenAdmin').classList.add('hidden')}
@@ -622,20 +639,40 @@ h+=`<div class="bg-cb-light/20 p-3 rounded-xl flex justify-between items-center 
 window.updPgj=async(id,st)=>{try{await updateDoc(doc(db,'pengajuan',id),{status:st});toast('Diupdate!','success')}catch(e){toast(e.message,'error')}};
 
 // === SHIFT ===
+function renderShiftCards(){
+    const h = `
+        <div class="glass p-5 rounded-xl text-center border-l-4 border-sky-400"><i data-lucide="sun" class="w-6 h-6 text-sky-400 mx-auto mb-2"></i><h4 class="font-bold text-sky-300">PAGI</h4><p class="text-xs text-gray-400 mt-1">${shiftTimes.pagi || '-'}</p></div>
+        <div class="glass p-5 rounded-xl text-center border-l-4 border-orange-400"><i data-lucide="cloud-sun" class="w-6 h-6 text-orange-400 mx-auto mb-2"></i><h4 class="font-bold text-orange-300">SORE</h4><p class="text-xs text-gray-400 mt-1">${shiftTimes.sore || '-'}</p></div>
+        <div class="glass p-5 rounded-xl text-center border-l-4 border-indigo-400"><i data-lucide="moon" class="w-6 h-6 text-indigo-400 mx-auto mb-2"></i><h4 class="font-bold text-indigo-300">MALAM</h4><p class="text-xs text-gray-400 mt-1">${shiftTimes.malam || '-'}</p></div>
+    `;
+    $('shiftTimeCards').innerHTML = h;
+    lucide.createIcons({nodes:[$('shiftTimeCards')]});
+}
+
+window.saveShiftTimes=async()=>{
+    try{
+        await setDoc(doc(db,'settings','shifts'),{
+            pagi: $('stPagi').value,
+            sore: $('stSore').value,
+            malam: $('stMalam').value
+        });
+        addLog('SHIFT_TIME_UPDATE','Leader mengubah waktu shift');
+        toast('Waktu shift disimpan!','success');
+    }catch(e){toast(e.message,'error')}
+};
+
 function renderShiftList(){const h=new Date().getHours();let cur='Malam';if(h>=8&&h<16)cur='Pagi';else if(h>=16&&h<23)cur='Sore';
 let h2='';allUsers.filter(u=>u.role!=='LEADER').forEach(u=>{const ic=u.shift===cur;$('shiftMgr')&&CU?.role==='LEADER'&&$('shiftMgr').classList.remove('hidden');
 h2+=`<div class="bg-cb-light/20 p-3 rounded-xl flex items-center justify-between border border-white/5 ${ic?'border-l-4 border-l-cb-accent':''}"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-lg ${ic?'bg-cb-accent/10 border border-cb-accent/30 text-cb-accent':'bg-cb-light border border-cb-border text-gray-500'} flex items-center justify-center font-bold text-xs">${u.nama.charAt(0)}</div><div><p class="text-white text-sm font-medium">${u.nama}</p><p class="text-[10px] text-gray-500">${u.role}</p></div></div><span class="text-xs font-mono ${ic?'text-cb-accent':'text-gray-500'}">${u.shift||'-'}</span></div>`});
  $('shiftList').innerHTML=h2||'<p class="text-gray-600 text-sm text-center py-4">-</p>';
-if(CU?.role==='LEADER')$('shiftMgr').classList.remove('hidden')}
+if(CU?.role==='LEADER'){$('shiftMgr').classList.remove('hidden');$('shiftTimeMgr').classList.remove('hidden');}}
 window.updShift=async()=>{const id=$('shiftStaf').value,sh=$('shiftType').value;if(!id)return;try{await updateDoc(doc(db,'users',id),{shift:sh});addLog('SHIFT_UPDATE',`Shift ${sh} untuk staff`);toast('Shift diupdate!','success')}catch(e){toast(e.message,'error')}};
 
 // === JOBDESK ===
 function renderJDCards(){
-    // Leader assignment
     if(CU?.role==='LEADER'||CU?.role==='CS LINE'){$('jdMgr').classList.remove('hidden');$('jdMgrAdd').classList.remove('hidden');
     let ah='';allUsers.filter(u=>u.role!=='LEADER').forEach(u=>{ah+=`<div class="flex items-center gap-3"><span class="text-white text-sm w-28 flex-shrink-0">${u.nama}</span><input value="${u.jobdesk||''}" onchange="updJD('${u.id}',this.value)" class="flex-1 bg-cb-light/50 border border-cb-border p-2 rounded-lg text-white text-sm" placeholder="Jobdesk..."></div>`});
     $('jdAssign').innerHTML=ah}
-    // Task list
     const t=today(),myJD=allJD.filter(j=>j.tanggal===t);let h='';
     myJD.forEach(j=>{const done=j.status==='selesai';h+=`<div class="bg-cb-light/20 p-3 rounded-xl flex justify-between items-center border border-white/5"><div class="flex items-center gap-3"><button onclick="togJD('${j.id}','${j.status}')" class="w-5 h-5 rounded border ${done?'bg-cb-accent border-cb-accent':'border-gray-600'} flex items-center justify-center transition">${done?'<i data-lucide="check" class="w-3 h-3 text-cb-bg"></i>':''}</button><span class="${done?'line-through text-gray-600':'text-white'} text-sm">${j.task}</span></div>${CU?.role==='LEADER'||CU?.role==='CS LINE'?`<button onclick="delJD('${j.id}')" class="text-gray-600 hover:text-cb-danger"><i data-lucide="trash-2" class="w-3 h-3"></i></button>`:''}</div>`});
     $('jdList').innerHTML=h||'<p class="text-gray-600 text-sm text-center py-4">-</p>';lucide.createIcons({nodes:[$('jdList')]})
@@ -699,7 +736,7 @@ function renderUsers(){if(CU?.role!=='LEADER')return;
 (async()=>{try{const uS=await getDocs(collection(db,'users')),iS=await getDocs(collection(db,'invitations'));let h='',opts='';
 uS.forEach(d=>{const u=d.data();if(u.role==='LEADER')return;const dot=u.status==='online'?'bg-cb-success shadow-[0_0_6px_rgba(0,230,118,.5)]':'bg-gray-600';
 h+=`<tr class="border-b border-cb-border/50 hover:bg-cb-light/20"><td class="p-3 font-medium text-white">${u.nama}</td><td class="p-3 text-gray-500 text-[10px]">${u.email}</td><td class="p-3"><span class="bg-cb-accent/10 text-cb-accent px-1.5 py-0.5 rounded text-[10px] font-mono">${u.role}</span></td><td class="p-3 text-[10px] font-mono">${u.shift||'-'}</td><td class="p-3"><span class="w-2 h-2 rounded-full ${dot} inline-block"></span></td><td class="p-3"><button onclick="delStaf('${d.id}')" class="text-gray-600 hover:text-cb-danger"><i data-lucide="trash-2" class="w-3 h-3"></i></button></td></tr>`;
-opts+=`<option value="${d.id}">${u.nama} (${u.role})</option>`});
+opts+=`<option value="${d.id}">${u.nama} (${u.role})</option>`})
 iS.forEach(d=>{const u=d.data();h+=`<tr class="border-b border-cb-border/50 bg-yellow-900/5"><td class="p-3 text-yellow-300 italic">${u.nama}</td><td class="p-3 text-[10px]">${u.email}</td><td class="p-3 text-[10px]">${u.role}</td><td class="p-3 text-gray-600 text-[10px]">Pending</td><td class="p-3"><span class="w-2 h-2 rounded-full bg-cb-warn inline-block"></span></td><td class="p-3"><button onclick="delInv('${d.id}')" class="text-gray-600 hover:text-cb-danger"><i data-lucide="x-circle" class="w-3 h-3"></i></button></td></tr>`});
  $('userTbody').innerHTML=h;lucide.createIcons({nodes:[$('userTbody')]});
 ['shiftStaf','rekapStaf','lemburStaf'].forEach(id=>{if($(id))$(id).innerHTML=opts})}catch(e){}})()}
